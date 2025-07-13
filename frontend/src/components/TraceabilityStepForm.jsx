@@ -62,7 +62,7 @@ export function TraceabilityStepForm({ productId, onSuccess, onCancel }) {
       };
 
       // Assuming your Node.js backend endpoint for adding a step is POST /api/products/:productId/steps
-      const response = await fetch(`/api/products/${productId}/steps`, {
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/${productId}/steps`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

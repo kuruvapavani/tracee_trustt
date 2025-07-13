@@ -1,125 +1,132 @@
 const Product = require('../models/Product');
+const contract = require('../config/blockchain');
 
-// @desc    Get product details by QR code
-// @route   GET /api/products/:qrCode
-// @access  Public
+// GET /api/products/:qrCode
 const getProductByQR = async (req, res, next) => {
   try {
     const product = await Product.findOne({ qrCode: req.params.qrCode });
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
+    if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Increment product scan count
-// @route   POST /api/products/:qrCode/scan
-// @access  Public (typically, as consumers scan)
+// PATCH /api/products/scan/:qrCode
 const updateScanCount = async (req, res, next) => {
   try {
-    // Find product by QR code and increment scanCount
     const product = await Product.findOneAndUpdate(
       { qrCode: req.params.qrCode },
-      { $inc: { scanCount: 1 } }, // Increment scanCount by 1
-      { new: true } // Return the updated document
+      { $inc: { scanCount: 1 } },
+      { new: true }
     );
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
+    if (!product) return res.status(404).json({ message: 'Product not found' });
     res.json(product);
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Add a new traceability step to a product
-// @route   POST /api/products/:productId/steps
-// @access  Private (Admin only) - uses protect and authorizeRoles middleware
+// POST /api/products
+const createProduct = async (req, res, next) => {
+  try {
+    const { name, description, qrCode } = req.body;
+
+    if (!name || !qrCode || !description) {
+      return res.status(400).json({ message: 'Product name, description, and QR code are required.' });
+    }
+
+    const productExists = await Product.findOne({ qrCode });
+    if (productExists) {
+      return res.status(400).json({ message: 'Product with this QR code already exists.' });
+    }
+
+    // Save on blockchain
+    const tx = await contract.createProduct(qrCode, name, description);
+    await tx.wait();
+
+    // Save to MongoDB
+    const product = await Product.create({
+      name,
+      description,
+      qrCode
+    });
+
+    res.status(201).json(product);
+  } catch (error) {
+    console.error("Create product error:", error);
+    next(error);
+  }
+};
+
+// POST /api/products/:productId/steps
 const addTraceabilityStep = async (req, res, next) => {
   try {
-    // Extract step details from request body
     const { stepType, description, location, certification, metadata } = req.body;
+    const { qrCode } = req.params;
 
-    // Basic validation for required step fields
     if (!stepType || !description || !location) {
-      return res.status(400).json({ message: 'Please provide stepType, description, and location for the step.' });
+      return res.status(400).json({ message: 'Missing required step details.' });
     }
 
-    // Find the product by its ID
-    const product = await Product.findById(req.params.productId);
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
+    const product = await Product.findOne({ qrCode });
+    if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    // Create the new step object
     const newStep = {
       stepType,
       description,
       location,
       certification,
-      metadata: metadata || {}, // Ensure metadata is an object, even if empty
-      timestamp: new Date() // Set timestamp on the server side
+      metadata: metadata || {},
+      timestamp: new Date()
     };
 
-    // Add the new step to the product's 'steps' array
     product.steps.push(newStep);
-    await product.save(); // Save the updated product document
+    await product.save();
 
-    // Return the newly added step to the frontend, or the updated product
+    const tx = await contract.addStep(qrCode, stepType, description, location);
+    await tx.wait();
+
     res.status(201).json(product.steps[product.steps.length - 1]);
+  } catch (error) {
+    console.error("Trace step error:", error);
+    next(error);
+  }
+};
 
+
+// GET /api/products
+const getAllProducts = async (req, res, next) => {
+  try {
+    const products = await Product.find({});
+    res.json(products);
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Get all products (for Admin Dashboard)
-// @route   GET /api/products
-// @access  Private (Admin only)
-const getAllProducts = async (req, res, next) => {
-    try {
-        const products = await Product.find({}); // Fetch all products
-        res.json(products);
-    } catch (error) {
-        next(error);
-    }
+// GET /api/products/verify/:qrCode
+const verifyProduct = async (req, res, next) => {
+  try {
+    const { qrCode } = req.params;
+    const product = await Product.findOne({ qrCode });
+    if (!product) return res.status(404).json({ message: 'Product not found locally' });
+
+    const blockchainProduct = await contract.products(qrCode);
+    const isAuthentic = blockchainProduct.exists;
+
+    res.json({ authentic: isAuthentic });
+  } catch (error) {
+    console.error("Verify product error:", error);
+    next(error);
+  }
 };
-
-// @desc    Create a new product
-// @route   POST /api/products
-// @access  Private (Admin only)
-const createProduct = async (req, res, next) => {
-    try {
-        const { name, description, qrCode } = req.body;
-
-        // Validate required fields
-        if (!name || !qrCode) {
-            return res.status(400).json({ message: 'Product name and QR code are required.' });
-        }
-
-        // Check if a product with this QR code already exists
-        const productExists = await Product.findOne({ qrCode });
-        if (productExists) {
-            return res.status(400).json({ message: 'Product with this QR code already exists.' });
-        }
-
-        const product = await Product.create({ name, description, qrCode });
-        res.status(201).json(product); // Respond with the newly created product
-
-    } catch (error) {
-        next(error);
-    }
-};
-
 
 module.exports = {
   getProductByQR,
   updateScanCount,
   addTraceabilityStep,
   getAllProducts,
-  createProduct
+  createProduct,
+  verifyProduct
 };

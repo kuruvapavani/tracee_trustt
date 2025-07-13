@@ -17,7 +17,7 @@ export function ProductDetails({ productId, onBack }) {
     setError(null);
     try {
       // Assuming your backend endpoint for getting product by ID is /api/products/:id
-      const response = await fetch(`/api/products/${productId}`);
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/${productId}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -45,7 +45,7 @@ export function ProductDetails({ productId, onBack }) {
     if (!product) return; // Should not happen if UI is correctly rendered
     try {
       // Assuming your backend endpoint for updating product status is PATCH /api/products/:id/status
-      const response = await fetch(`/api/products/${product._id}/status`, {
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/${product._id}/status`, {
         method: "PATCH", // Or PUT, depending on your API design
         headers: {
           "Content-Type": "application/json",

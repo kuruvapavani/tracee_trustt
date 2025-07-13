@@ -19,7 +19,9 @@ export function AdminDashboard({ user }) {
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     try {
-      const response = await fetch("http://localhost:5000/api/products");
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}/api/products`
+      );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -34,23 +36,38 @@ export function AdminDashboard({ user }) {
     }
   }, []);
 
-  const fetchAdminStats = useCallback(async () => {
-    setIsLoadingStats(true);
-    try {
-      const response = await fetch("http://localhost:5000/api/admin-stats");
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setAdminStats(data);
-    } catch (error) {
-      console.error("Failed to fetch admin stats:", error);
-      toast.error("Failed to load admin stats: " + error.message);
-      setAdminStats(null); // Clear stats on error
-    } finally {
-      setIsLoadingStats(false);
+ const fetchAdminStats = useCallback(async () => {
+  setIsLoadingStats(true);
+  try {
+    const token = localStorage.getItem("authToken");
+
+    if (!token) {
+      throw new Error("No auth token found");
     }
-  }, []);
+
+    const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/admin/stats`, {
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    setAdminStats(data);
+  } catch (error) {
+    console.error("Failed to fetch admin stats:", error);
+    toast.error("Failed to load admin stats: " + error.message);
+    setAdminStats(null);
+  } finally {
+    setIsLoadingStats(false);
+  }
+}, []);
+
+
 
   // --- Effects for Initial Data Load ---
 
@@ -63,14 +80,17 @@ export function AdminDashboard({ user }) {
 
   const createSampleData = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/sample-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        // You might send some data with the request if your backend expects it
-        // body: JSON.stringify({ userId: user._id }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}/api/sample-data`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // You might send some data with the request if your backend expects it
+          // body: JSON.stringify({ userId: user._id }),
+        }
+      );
 
       const result = await response.json();
 
@@ -87,13 +107,16 @@ export function AdminDashboard({ user }) {
 
   const setUserRole = async (roleData) => {
     try {
-      const response = await fetch("http://localhost:5000/api/user-roles", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(roleData),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}/api/user-roles`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(roleData),
+        }
+      );
 
       const result = await response.json();
 
@@ -199,13 +222,20 @@ export function AdminDashboard({ user }) {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {activeTab === "dashboard" && (
           // Pass loading state to AdminStats if it needs to display a spinner
-          <AdminStats stats={adminStats} products={products} isLoadingStats={isLoadingStats} isLoadingProducts={isLoadingProducts} />
+          <AdminStats
+            stats={adminStats}
+            products={products}
+            isLoadingStats={isLoadingStats}
+            isLoadingProducts={isLoadingProducts}
+          />
         )}
 
         {activeTab === "products" && (
           <div className="bg-white rounded-lg shadow">
             {isLoadingProducts ? (
-              <div className="p-6 text-center text-gray-500">Loading products...</div>
+              <div className="p-6 text-center text-gray-500">
+                Loading products...
+              </div>
             ) : (
               <ProductList
                 products={products}

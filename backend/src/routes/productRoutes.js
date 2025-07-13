@@ -1,24 +1,22 @@
 const express = require('express');
+const router = express.Router();
 const {
   getProductByQR,
   updateScanCount,
   addTraceabilityStep,
   getAllProducts,
   createProduct,
+  verifyProduct
 } = require('../controllers/productController');
-const { protect, authorizeRoles } = require('../middlewares/authMiddleware');
 
-const router = express.Router();
-
-// Public routes for consumer scanning and basic product info
+// Public
+router.get('/verify/:qrCode', verifyProduct);
 router.get('/:qrCode', getProductByQR);
-router.post('/:qrCode/scan', updateScanCount); // Assuming scan count update is public
+router.post('/:qrCode/scan', updateScanCount);
 
-// Admin routes (require authentication and authorization)
-// Use 'protect' middleware to ensure user is logged in
-// Use 'authorizeRoles('admin')' middleware to ensure only admin users can access
-router.post('/', protect, authorizeRoles('admin'), createProduct);
-router.get('/', protect, authorizeRoles('admin'), getAllProducts); // Get all products for admin dashboard
-router.post('/:productId/steps', protect, authorizeRoles('admin'), addTraceabilityStep);
+// Private/Admin
+router.get('/', getAllProducts);
+router.post('/', createProduct);
+router.post('/:qrCode/steps', addTraceabilityStep);
 
 module.exports = router;

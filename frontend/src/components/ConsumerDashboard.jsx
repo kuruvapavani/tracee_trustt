@@ -14,7 +14,7 @@ export function ConsumerDashboard() {
     setProductNotFound(false); // Reset not found status
     setFetchError(null);      // Clear any previous fetch errors
     try {
-      const response = await fetch(`/api/products/by-qr/${code}`); // Your backend endpoint
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/by-qr/${code}`); // Your backend endpoint
       if (response.status === 404) {
         setProductNotFound(true);
         return null; // Product not found
@@ -35,7 +35,7 @@ export function ConsumerDashboard() {
   // Function to update scan count
   const updateScanCount = useCallback(async (code) => {
     try {
-      const response = await fetch("/api/products/update-scan-count", { // Your backend endpoint
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/update-scan-count`, { // Your backend endpoint
         method: "POST", // Or PUT, depending on your API design
         headers: {
           "Content-Type": "application/json",

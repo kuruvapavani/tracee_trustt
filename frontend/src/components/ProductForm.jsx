@@ -1,6 +1,6 @@
 import { useState } from "react";
-// Removed Convex imports: useMutation, api
-import { toast } from "sonner"; // Assuming sonner toast library is still used
+import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid"; // for generating unique QR codes
 
 export function ProductForm({ onSuccess }) {
   const [formData, setFormData] = useState({
@@ -11,31 +11,7 @@ export function ProductForm({ onSuccess }) {
     batchNumber: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Replaced useMutation with a plain async function for creating a product
-  const createProduct = async (productData) => {
-    try {
-      // Assuming your backend endpoint for creating a product is POST /api/products
-      const response = await fetch("/api/products", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(productData),
-      });
-
-      const result = await response.json(); // Parse the JSON response
-
-      if (!response.ok) {
-        // If the response status is not OK (e.g., 4xx or 5xx), throw an error
-        throw new Error(result.message || "Failed to create product");
-      }
-      return result; // Return the result from the backend (should contain the new product and QR code)
-    } catch (error) {
-      console.error("Error creating product:", error);
-      throw error; // Re-throw to be caught by the handleSubmit's try-catch block
-    }
-  };
+  const [qrCode, setQrCode] = useState(null);
 
   const categories = [
     "Food & Beverages",
@@ -48,17 +24,63 @@ export function ProductForm({ onSuccess }) {
     "Other"
   ];
 
+  // Helper: Add step to backend
+  const addStep = async (qrCode, stepType, description, location) => {
+  const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/${qrCode}/steps`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ stepType, description, location }),
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || `Failed to add step: ${stepType}`);
+  }
+  return result;
+};
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
+    const generatedQrCode = `QR-${uuidv4()}`;
+
     try {
-      // Call the new createProduct function
-      const result = await createProduct(formData);
-      // Assuming the backend returns the created product with a qrCode field
-      toast.success(`Product created successfully! QR Code: ${result.qrCode}`);
-      
-      // Reset form fields after successful submission
+      // Step 1: Create the product
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          qrCode: generatedQrCode,
+        }),
+      });
+
+      const product = await response.json();
+      if (!response.ok) {
+        throw new Error(product.message || "Failed to create product");
+      }
+
+      setQrCode(generatedQrCode);
+
+      // Step 2: Add traceability steps
+      const steps = [
+        { stepType: "Manufacturing", description: "Product manufactured", location: formData.manufacturer },
+        { stepType: "Packaging", description: "Product packed", location: formData.manufacturer },
+        { stepType: "Shipping", description: "Product shipped", location: "Distribution Center" }
+      ];
+
+      for (const step of steps) {
+        await addStep(product._id, step.stepType, step.description, step.location);
+      }
+
+      toast.success(`Product created with QR Code: ${generatedQrCode}`);
       setFormData({
         name: "",
         description: "",
@@ -66,21 +88,16 @@ export function ProductForm({ onSuccess }) {
         manufacturer: "",
         batchNumber: "",
       });
-      
-      // Call the onSuccess callback passed from the parent component
       if (onSuccess) onSuccess();
     } catch (error) {
-      toast.error("Failed to create product: " + error.message);
+      toast.error("Error: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   return (
@@ -93,82 +110,70 @@ export function ProductForm({ onSuccess }) {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Product Name *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter product name"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
             <select
               name="category"
               value={formData.category}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select category</option>
               {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
+                <option key={category} value={category}>{category}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Manufacturer *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Manufacturer *</label>
             <input
               type="text"
               name="manufacturer"
               value={formData.manufacturer}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter manufacturer name"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Batch Number *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Batch Number *</label>
             <input
               type="text"
               name="batchNumber"
               value={formData.batchNumber}
               onChange={handleChange}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter batch number"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Description *
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
           <textarea
             name="description"
             value={formData.description}
             onChange={handleChange}
             required
             rows={4}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter product description"
           />
         </div>
@@ -176,13 +181,15 @@ export function ProductForm({ onSuccess }) {
         <div className="flex justify-end space-x-4">
           <button
             type="button"
-            onClick={() => setFormData({
-              name: "",
-              description: "",
-              category: "",
-              manufacturer: "",
-              batchNumber: "",
-            })}
+            onClick={() =>
+              setFormData({
+                name: "",
+                description: "",
+                category: "",
+                manufacturer: "",
+                batchNumber: "",
+              })
+            }
             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
           >
             Reset
@@ -202,6 +209,12 @@ export function ProductForm({ onSuccess }) {
             )}
           </button>
         </div>
+
+        {qrCode && (
+          <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-lg font-medium">
+            Product created! QR Code: <span className="font-bold">{qrCode}</span>
+          </div>
+        )}
       </form>
     </div>
   );

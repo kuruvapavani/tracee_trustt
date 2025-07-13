@@ -12,7 +12,7 @@ export function BlockchainMonitor() {
     setError(null); // Clear previous errors
     try {
       // Make a GET request to your Node.js backend endpoint
-      const response = await fetch("/api/blockchain-stats");
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/blockchain-stats`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
