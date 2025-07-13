@@ -44,11 +44,13 @@ export function ProductDetails({ productId, onBack }) {
   const handleStatusUpdate = async (newStatus) => {
     if (!product) return; // Should not happen if UI is correctly rendered
     try {
+      const token = localStorage.getItem("token");
       // Assuming your backend endpoint for updating product status is PATCH /api/products/:id/status
       const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/${product._id}/status`, {
         method: "PATCH", // Or PUT, depending on your API design
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({ status: newStatus }),
       });

@@ -81,16 +81,23 @@ const getProductById = async (req, res, next) => {
 
 // Get product by QR Code
 // GET /api/products/qr/:qrCode
+// GET /api/products/qr/:qrCode
 const getProductByQR = async (req, res, next) => {
   try {
-    const product = await Product.findOne({ qrCode: req.params.qrCode });
+    const product = await Product.findOneAndUpdate(
+      { qrCode: req.params.qrCode },
+      { $inc: { scannedCount: 1 } }, // increment scan count
+      { new: true }
+    );
+
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
   } catch (err) {
-    console.error("❌ Fetch by QR code failed:", err);
+    console.error("❌ Failed to fetch and increment scan count:", err);
     next(err);
   }
 };
+
 
 // Update product status
 // PATCH /api/products/:id/status
@@ -196,7 +203,7 @@ const myProducts = async (req, res) => {
     }
     // Directly use the authenticated user's ID to filter products
     const userId = req.user._id;
-    const products = await Product.find({ createdBy: userId });
+    const products = await Product.find({ createdBy: userId }).sort({ createdAt: -1 });;
     res.json(products);
   } catch (error) {
     console.error("❌ Fetch my products failed:", error);

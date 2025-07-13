@@ -1,79 +1,57 @@
+const { ethers } = require("ethers");
+const rawABI = require("../config/abis/ProductTraceability.json");
+const ABI = rawABI.abi;
+
+const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS;
+const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+
 const getBlockchainStats = async (req, res) => {
   try {
-    // Mock data — replace this with real data later from Ethers.js/Web3.js
-    const data = {
-      network: "Ethereum Sepolia",
-      lastBlockNumber: 18542912,
-      averageConfirmationTime: "12.5s",
-      totalTransactions: 13942,
-      totalGasUsed: "3,259,000",
-      contractAddress: "0x1234abcd5678efgh9012ijkl3456mnop7890qrst",
-      recentActivity: [
-        {
-          type: "Add Step",
-          hash: "0xabc123456789...",
-          time: "5 mins ago",
-          status: "confirmed",
-        },
-        {
-          type: "Product Registered",
-          hash: "0xdef987654321...",
-          time: "10 mins ago",
-          status: "pending",
-        },
-        {
-          type: "Authenticity Verified",
-          hash: "0xaaa555333222...",
-          time: "20 mins ago",
-          status: "confirmed",
-        },
-      ],
+    const network = await provider.getNetwork();
+    const blockNumber = await provider.getBlockNumber();
+    const fromBlock = Math.max(blockNumber - 1000, 0); // last 1000 blocks
+
+    // ✅ Correct event names from your ABI
+    const stepEvents = await contract.queryFilter("StepAdded", fromBlock, blockNumber);
+    const productEvents = await contract.queryFilter("ProductCreated", fromBlock, blockNumber);
+
+    // Helper to format each event
+    const formatEvent = async (event, type) => {
+      const block = await provider.getBlock(event.blockNumber);
+      return {
+        type,
+        hash: event.transactionHash,
+        time: new Date(block.timestamp * 1000).toLocaleString(),
+        status: "confirmed",
+      };
     };
 
-    res.json(data);
+    const recentActivity = await Promise.all([
+      ...productEvents.map(e => formatEvent(e, "Product Created")),
+      ...stepEvents.map(e => formatEvent(e, "Step Added")),
+    ]);
+
+    // Sort and limit
+    recentActivity.sort((a, b) => new Date(b.time) - new Date(a.time));
+    const latestActivity = recentActivity.slice(0, 10);
+
+    res.json({
+      network: `${network.name} (Chain ID: ${network.chainId})`,
+      lastBlockNumber: blockNumber,
+      averageConfirmationTime: "12.5s",
+      totalTransactions: productEvents.length + stepEvents.length,
+      totalGasUsed: "N/A", // You can calculate this optionally
+      contractAddress: CONTRACT_ADDRESS,
+      recentActivity: latestActivity,
+    });
   } catch (err) {
-    console.error("Blockchain stats error:", err);
+    console.error("❌ Blockchain stats error:", err);
     res.status(500).json({ message: "Failed to fetch blockchain stats" });
   }
 };
 
+// backend/controllers/traceabilityController.js
+const Product = require("../models/Product");
+
 module.exports = { getBlockchainStats };
-
-
-// const { ethers } = require("ethers");
-
-// const provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL); // e.g., from Alchemy or Infura
-
-// const CONTRACT_ADDRESS = `${process.env.CONTRACT_ADDRESS}`;
-// const ABI = require("../config/abis/ProductTraceability.json"); // Replace with your actual ABI JSON
-
-// const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
-
-// const getBlockchainStats = async (req, res) => {
-//   try {
-//     const network = await provider.getNetwork();
-//     const blockNumber = await provider.getBlockNumber();
-//     const latestBlock = await provider.getBlock(blockNumber);
-//     const gasUsed = latestBlock.gasUsed.toString();
-
-//     // Optional: call smart contract methods
-//     // const totalTransactions = await contract.totalTransactions();
-
-//     const data = {
-//       network: network.name + " (Chain ID: " + network.chainId + ")",
-//       lastBlockNumber: blockNumber,
-//       averageConfirmationTime: "12.5s", // Replace with your own calculation if needed
-//       totalTransactions: 13942, // Replace with dynamic contract call if available
-//       totalGasUsed: gasUsed,
-//       contractAddress: CONTRACT_ADDRESS,
-//       recentActivity: [], // You can later fetch recent txs using Alchemy/Infura or custom logic
-//     };
-
-//     res.json(data);
-//   } catch (err) {
-//     console.error("Blockchain stats error:", err);
-//     res.status(500).json({ message: "Failed to fetch blockchain stats" });
-//   }
-// };
-
-// module.exports = { getBlockchainStats };

@@ -36,6 +36,8 @@ export function AdminDashboard({ user }) {
       }
       const data = await response.json();
       setProducts(data);
+      console.log("Products " ,data);
+      
     } catch (error) {
       console.error("Failed to fetch products:", error);
       toast.error("Failed to load products: " + error.message);
