@@ -9,6 +9,9 @@ const generateToken = (id) => {
   });
 };
 
+
+
+
 // @desc    Register a new user (Optional: typically for initial setup or admin creation)
 // @route   POST /api/auth/register
 // @access  Public (or could be Admin-only via authorizeRoles middleware)

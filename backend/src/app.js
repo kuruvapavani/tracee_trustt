@@ -13,6 +13,9 @@ app.use(express.json()); // Body parser for JSON requests
 app.use(cors()); // Enable CORS for all origins (adjust for production environment for security)
 
 // Routes
+const blockchainRoutes = require("./routes/blockchainRoutes");
+app.use("/api", blockchainRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use("/api/admin", adminRoutes);

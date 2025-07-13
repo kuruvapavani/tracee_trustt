@@ -39,7 +39,7 @@ export function AdminDashboard({ user }) {
  const fetchAdminStats = useCallback(async () => {
   setIsLoadingStats(true);
   try {
-    const token = localStorage.getItem("authToken");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       throw new Error("No auth token found");
