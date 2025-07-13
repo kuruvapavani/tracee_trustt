@@ -21,46 +21,68 @@ export function ProductForm({ onSuccess }) {
     "Automotive",
     "Cosmetics",
     "Agriculture",
-    "Other"
+    "Other",
   ];
 
   // Helper: Add step to backend
   const addStep = async (qrCode, stepType, description, location) => {
-  const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products/${qrCode}/steps`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ stepType, description, location }),
-  });
+    const token = localStorage.getItem("token"); // Retrieve token for authenticated request
+    if (!token) {
+      throw new Error("Authentication token not found. Please log in.");
+    }
 
-  const result = await response.json();
-  if (!response.ok) {
-    throw new Error(result.message || `Failed to add step: ${stepType}`);
-  }
-  return result;
-};
+    const response = await fetch(
+      `${process.env.REACT_APP_BASE_URL}/api/products/${qrCode}/steps`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // Add Authorization header
+        },
+        body: JSON.stringify({ stepType, description, location }),
+      }
+    );
 
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || `Failed to add step: ${stepType}`);
+    }
+    return result;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     const generatedQrCode = `QR-${uuidv4()}`;
+    const token = localStorage.getItem("token"); // Retrieve token for authenticated request
+
+    if (!token) {
+      toast.error("Authentication token not found. Please log in.");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       // Step 1: Create the product
-      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/products`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          description: formData.description,
-          qrCode: generatedQrCode,
-        }),
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_BASE_URL}/api/products`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // Corrected Authorization header
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            description: formData.description,
+            qrCode: generatedQrCode,
+            category: formData.category, // Include category
+            manufacturer: formData.manufacturer, // Include manufacturer
+            batchNumber: formData.batchNumber, // Include batchNumber
+          }),
+        }
+      );
 
       const product = await response.json();
       if (!response.ok) {
@@ -70,14 +92,15 @@ export function ProductForm({ onSuccess }) {
       setQrCode(generatedQrCode);
 
       // Step 2: Add traceability steps
-      const steps = [
-        { stepType: "Manufacturing", description: "Product manufactured", location: formData.manufacturer },
-        { stepType: "Packaging", description: "Product packed", location: formData.manufacturer },
-        { stepType: "Shipping", description: "Product shipped", location: "Distribution Center" }
-      ];
+      const steps = [];
 
       for (const step of steps) {
-        await addStep(product._id, step.stepType, step.description, step.location);
+        await addStep(
+          generatedQrCode,
+          step.stepType,
+          step.description,
+          step.location
+        ); // Use generatedQrCode
       }
 
       toast.success(`Product created with QR Code: ${generatedQrCode}`);
@@ -104,13 +127,17 @@ export function ProductForm({ onSuccess }) {
     <div className="p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Create New Product</h2>
-        <p className="text-gray-600 mt-1">Add a new product to the traceability system</p>
+        <p className="text-gray-600 mt-1">
+          Add a new product to the traceability system
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Product Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Product Name *
+            </label>
             <input
               type="text"
               name="name"
@@ -123,7 +150,9 @@ export function ProductForm({ onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category *
+            </label>
             <select
               name="category"
               value={formData.category}
@@ -133,13 +162,17 @@ export function ProductForm({ onSuccess }) {
             >
               <option value="">Select category</option>
               {categories.map((category) => (
-                <option key={category} value={category}>{category}</option>
+                <option key={category} value={category}>
+                  {category}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Manufacturer *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Manufacturer *
+            </label>
             <input
               type="text"
               name="manufacturer"
@@ -152,7 +185,9 @@ export function ProductForm({ onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Batch Number *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Batch Number *
+            </label>
             <input
               type="text"
               name="batchNumber"
@@ -166,7 +201,9 @@ export function ProductForm({ onSuccess }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Description *
+          </label>
           <textarea
             name="description"
             value={formData.description}
@@ -212,7 +249,8 @@ export function ProductForm({ onSuccess }) {
 
         {qrCode && (
           <div className="mt-4 p-4 bg-green-50 text-green-800 rounded-lg font-medium">
-            Product created! QR Code: <span className="font-bold">{qrCode}</span>
+            Product created! QR Code:{" "}
+            <span className="font-bold">{qrCode}</span>
           </div>
         )}
       </form>

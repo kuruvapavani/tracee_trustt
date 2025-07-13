@@ -19,9 +19,18 @@ export function AdminDashboard({ user }) {
   const fetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
     try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No auth token found");
+
       const response = await fetch(
-        `${process.env.REACT_APP_BASE_URL}/api/products`
+        `${process.env.REACT_APP_BASE_URL}/api/products/my-products`,
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        }
       );
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -36,47 +45,45 @@ export function AdminDashboard({ user }) {
     }
   }, []);
 
- const fetchAdminStats = useCallback(async () => {
-  setIsLoadingStats(true);
-  try {
-    const token = localStorage.getItem("token");
+  const fetchAdminStats = useCallback(async () => {
+    setIsLoadingStats(true);
+    try {
+      const token = localStorage.getItem("token");
 
-    if (!token) {
-      throw new Error("No auth token found");
+      if (!token) {
+        throw new Error("No auth token found");
+      }
+
+      const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/admin/stats`, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAdminStats(data);
+    } catch (error) {
+      console.error("Failed to fetch admin stats:", error);
+      toast.error("Failed to load admin stats: " + error.message);
+      setAdminStats(null);
+    } finally {
+      setIsLoadingStats(false);
     }
-
-    const response = await fetch(`${process.env.REACT_APP_BASE_URL}/api/admin/stats`, {
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    setAdminStats(data);
-  } catch (error) {
-    console.error("Failed to fetch admin stats:", error);
-    toast.error("Failed to load admin stats: " + error.message);
-    setAdminStats(null);
-  } finally {
-    setIsLoadingStats(false);
-  }
-}, []);
-
-
+  }, []);
 
   // --- Effects for Initial Data Load ---
 
   useEffect(() => {
     fetchProducts();
     fetchAdminStats();
-  }, [fetchProducts, fetchAdminStats]); // Depend on memoized fetch functions
+  }, [fetchProducts, fetchAdminStats]);
 
-  // --- API Call Functions (replacing mutations/actions) ---
+  // --- API Call Functions ---
 
   const createSampleData = async () => {
     try {
@@ -87,8 +94,6 @@ export function AdminDashboard({ user }) {
           headers: {
             "Content-Type": "application/json",
           },
-          // You might send some data with the request if your backend expects it
-          // body: JSON.stringify({ userId: user._id }),
         }
       );
 
@@ -98,8 +103,8 @@ export function AdminDashboard({ user }) {
         throw new Error(result.message || "Failed to create sample data");
       }
       toast.success(result.message);
-      fetchProducts(); // Re-fetch products after creating sample data
-      fetchAdminStats(); // Re-fetch stats as well
+      fetchProducts();
+      fetchAdminStats();
     } catch (error) {
       toast.error("Failed to create sample data: " + error.message);
     }
@@ -123,26 +128,21 @@ export function AdminDashboard({ user }) {
       if (!response.ok) {
         throw new Error(result.message || "Failed to set user role");
       }
-      // Assuming you don't need to re-fetch user data immediately for this component
-      // If you do, you'd trigger a re-fetch of the user prop or similar mechanism
     } catch (error) {
       console.error("Failed to set user role:", error);
-      // toast.error("Failed to set user role: " + error.message); // This might be too frequent/annoying
     }
   };
 
-  // Set user role if not set
   useEffect(() => {
     if (user && !user.role) {
-      // Ensure user object has necessary info before sending
       setUserRole({
-        userId: user._id, // Assuming your user object has an _id from MongoDB
+        userId: user._id,
         role: "admin",
         companyName: user.companyName || "My Company",
         industry: "Technology",
       });
     }
-  }, [user]); // Removed setUserRole from dependency array as it's an async function and not a stable reference
+  }, [user]);
 
   const handleCreateSampleData = async () => {
     await createSampleData();
@@ -161,7 +161,7 @@ export function AdminDashboard({ user }) {
         productId={selectedProductId}
         onBack={() => {
           setSelectedProductId(null);
-          fetchProducts(); // Re-fetch products after returning from details (in case of edits/deletes in details)
+          fetchProducts();
         }}
       />
     );
@@ -169,7 +169,6 @@ export function AdminDashboard({ user }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -183,7 +182,6 @@ export function AdminDashboard({ user }) {
               </p>
             </div>
 
-            {/* Only show "Create Sample Data" if products array is empty and not currently loading */}
             {!isLoadingProducts && products.length === 0 && (
               <button
                 onClick={handleCreateSampleData}
@@ -196,7 +194,6 @@ export function AdminDashboard({ user }) {
         </div>
       </div>
 
-      {/* Tab Navigation */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4">
           <nav className="flex space-x-8">
@@ -218,10 +215,8 @@ export function AdminDashboard({ user }) {
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         {activeTab === "dashboard" && (
-          // Pass loading state to AdminStats if it needs to display a spinner
           <AdminStats
             stats={adminStats}
             products={products}
@@ -240,7 +235,7 @@ export function AdminDashboard({ user }) {
               <ProductList
                 products={products}
                 onSelectProduct={setSelectedProductId}
-                onProductActionSuccess={fetchProducts} // Pass callback to re-fetch after actions
+                onProductActionSuccess={fetchProducts}
               />
             )}
           </div>
@@ -251,8 +246,8 @@ export function AdminDashboard({ user }) {
             <ProductForm
               onSuccess={() => {
                 setActiveTab("products");
-                fetchProducts(); // Re-fetch products after successful creation
-                fetchAdminStats(); // Re-fetch stats as well (e.g., product count changes)
+                fetchProducts();
+                fetchAdminStats();
               }}
             />
           </div>

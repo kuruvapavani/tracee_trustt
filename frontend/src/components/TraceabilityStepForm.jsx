@@ -16,7 +16,7 @@ export function TraceabilityStepForm({ productId, onSuccess, onCancel }) {
     },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const token = localStorage.getItem("token");
   // Removed Convex useMutation: const addTraceabilityStep = useMutation(api.traceability.addTraceabilityStep);
 
   const stepTypes = [
@@ -66,7 +66,7 @@ export function TraceabilityStepForm({ productId, onSuccess, onCancel }) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Add any authentication headers if required (e.g., Authorization: Bearer <token>)
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(stepData),
       });
