@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
@@ -9,8 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // --- Using environment variable here ---
-  const API_BASE_URL = process.env.REACT_APP_BASE_URL || 'http://localhost:5000'; // Fallback for safety
+  const API_BASE_URL = process.env.REACT_APP_BASE_URL || 'http://localhost:5000';
 
   useEffect(() => {
     const loadUser = async () => {
@@ -51,7 +49,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     loadUser();
-  }, []);
+  }, [API_BASE_URL]);
 
   const login = async (email, password, role) => {
     try {
@@ -81,6 +79,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const register = async (email, password, role = 'consumer') => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, role }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      setUser({ _id: data._id, email: data.email, role: data.role });
+      setIsLoggedIn(true);
+      toast.success('Registered and logged in successfully!');
+      return data;
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error(error.message || 'Registration failed');
+      throw error;
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
@@ -89,7 +115,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn, loadingAuth, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoggedIn, loadingAuth, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

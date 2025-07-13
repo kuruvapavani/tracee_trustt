@@ -1,71 +1,87 @@
-// src/SignInForm.js
 import { useState } from "react";
 import { toast } from "sonner";
-import { useAuth } from '../contexts/AuthContext'; // Import useAuth
+import { useAuth } from "../contexts/AuthContext";
 
 export function SignInForm({ userRole }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const { login } = useAuth(); // Use the login function from AuthContext
+  const [flow, setFlow] = useState("signIn"); // "signIn" or "signUp"
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSigningIn(true);
+    setIsSubmitting(true);
     try {
-      await login(email, password, userRole); // Pass userRole to login
+      if (flow === "signIn") {
+        await login(email, password, userRole);
+      } else {
+        await register(email, password, userRole);
+        toast.success("Registered successfully! You can now sign in.");
+        setFlow("signIn");
+      }
     } catch (error) {
-      // toast.error is already handled by AuthContext's login
+      // toast handled inside AuthContext
     } finally {
-      setIsSigningIn(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-8">
       <form onSubmit={handleSubmit} className="space-y-6">
+        <h2 className="text-2xl font-semibold text-center">
+          {flow === "signIn" ? "Sign In" : "Sign Up"}
+        </h2>
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-            Email
-          </label>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">Email</label>
           <input
             type="email"
             id="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-md"
             placeholder="your@example.com"
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-            Password
-          </label>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">Password</label>
           <input
             type="password"
             id="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-md"
             placeholder="Enter your password"
           />
         </div>
         <button
           type="submit"
-          disabled={isSigningIn}
-          className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          disabled={isSubmitting}
+          className="w-full bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700"
         >
-          {isSigningIn ? (
-            <>
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Signing In...
-            </>
-          ) : (
-            `Sign In as ${userRole === 'admin' ? 'Admin' : 'Consumer'}`
-          )}
+          {isSubmitting
+            ? flow === "signIn"
+              ? "Signing In..."
+              : "Registering..."
+            : flow === "signIn"
+              ? `Sign In as ${userRole === 'admin' ? 'Admin' : 'Consumer'}`
+              : "Sign Up"}
         </button>
+        <p className="text-center text-sm mt-4">
+          {flow === "signIn"
+            ? "Don't have an account?"
+            : "Already have an account?"}
+          <button
+            type="button"
+            className="ml-1 text-blue-600 hover:underline"
+            onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
+          >
+            {flow === "signIn" ? "Sign Up" : "Sign In"}
+          </button>
+        </p>
       </form>
     </div>
   );
